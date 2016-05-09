@@ -43,7 +43,7 @@
            // your page initialization code here
            // the DOM will be available here
             document.title = player_name + " Shots";
-            var shot_chart_url = 'http://localhost:8888/nbashots/shots.php?player_id=' + player_id;
+            var shot_chart_url = 'http://nba.gainescommachris.com/shots.php?player_id=' + player_id;
             var data;
             var xmlHttp = new XMLHttpRequest();
             xmlHttp.open( "GET", shot_chart_url, false ); // false for synchronous request
@@ -132,7 +132,7 @@
         };
 
         var findPlayer = function(player_name) {
-            var player_url = 'http://localhost:8888/nbashots/player.php?name=' + player_name;
+            var player_url = 'http://nba.gainescommachris.com/player.php?name=' + player_name;
             var data;
             var xmlHttp = new XMLHttpRequest();
             xmlHttp.open( "GET", player_url, false ); // false for synchronous request
