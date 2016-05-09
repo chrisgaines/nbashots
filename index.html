@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Shots</title>
+
+        <link rel="stylesheet" type="text/css" href="css/shots.css">
+        <link rel="stylesheet" type="text/css" href="node_modules/bootstrap/dist/css/bootstrap.css">
+        <script src="node_modules/jquery/dist/jquery.min.js"></script>
+        <script src="node_modules/bootstrap/dist/js/bootstrap.js"></script>
+        <script src="node_modules/datalib/datalib.js"></script>
+        <script src="node_modules/d3/d3.min.js"></script>
+        <script src="js/hexbin.js"></script>
+        <script src="js/d3.chart.js"></script>
+        <script src="js/d3.chart.defaults.js"></script>
+        <script src="js/shots.js"></script>
+
+        <style>
+            svg { font-family: Arial, sans-serif; }
+        </style>
+
+    </head>
+    <body> 
+        <div class='container'>
+            <div class='row' style='text-align:center;margin-top:2em;'>
+                <div id="chart"></div>
+            </div>
+            <div class='row' style='text-align:center;margin-top:2em;'>
+                <div class='col-md-4 col-md-offset-4'>
+                    <div class="alert alert-danger" role="alert" style='display:none;' id='warning'><b>Oh no!</b> We couldn't find that player. Please check the spelling and try again.</div>
+                    <div class="form-group">
+                        <input type="text" class="form-control" placeholder="Find new player" id='player_name'>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary" id='find_player'>Go</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+
+    <script>
+        var buildChart = function(player_id = 201142, player_name = 'Kevin Durant') {
+           // your page initialization code here
+           // the DOM will be available here
+            document.title = player_name + " Shots";
+            var shot_chart_url = 'http://localhost:8888/nbashots/shots.php?player_id=' + player_id;
+            var data;
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET", shot_chart_url, false ); // false for synchronous request
+            xmlHttp.send( null );
+
+            var data = JSON.parse(xmlHttp.responseText);
+            // var playerArray = data.resultSets[0].rowSet;
+
+            // console.log(data);
+            var x = [];
+            var y = [];
+            var made = [];
+            var attempts = [];
+            data.forEach(function(a){
+
+                x.push(a.loc_x);
+                y.push(a.loc_y);
+                made.push(a.shot_made_flag);
+                attempts.push(a.shot_attempted_flag);
+
+            });
+            
+            var tenderData = [];
+            for(var i = 0; i < data.length; i++){
+                tenderData.push({"x":Math.ceil((x[i]+243)/10),
+                    "y": Math.ceil((y[i]+45)/10),
+                    "made": made[i],
+                    "attempts": attempts[i]});
+            };
+
+            var coll = d3.nest()
+                .key(function(d) {return [d.x, d.y]; })
+                .rollup(function(v){return{
+                    made: d3.sum(v, function(d) {return d.made}),
+                    attempts: d3.sum(v, function(d){return d.attempts}),
+                    shootingPercentage:  d3.sum(v, function(d) {return d.made})/d3.sum(v, function(d){return d.attempts})
+                }})
+                .entries(tenderData);
+
+
+            var shotper = [];
+            var finalData = [];
+            var z = [];
+            coll.forEach(function(a){
+                a.key = JSON.parse("[" + a.key + "]");
+                z.push(a.values.shootingPercentage);
+            });
+
+            var meanShot = dl.mean(z);
+            var shotSTDV = dl.stdev(z);
+
+            coll.forEach(function(a){
+                var k = (a.values.shootingPercentage - meanShot)/shotSTDV;
+                finalData.push({"x": a.key[0], "y": a.key[1], "z": k, "made": a.values.made, "attempts": a.values.attempts})
+            });
+
+            data = finalData;
+            // console.log(data);
+            // var data = {!! $player->shots() !!};
+
+            // var test = d3.hexbin(data);
+            
+            var options = {
+                title: player_name + ' 2015-2016',
+                // threePointCutoffLength: 5, // College
+                // threePointRadius: 20.9, // College
+                // threePointSideRadius: 20.9, // College
+                // restrictedCircleRadius: 3, // College
+                // hexagonRadiusSizes: [0, .7, .8, .9],
+                colorLegendStartLabel: 'low',
+                colorLegendEndLabel: 'high',
+                heatScale: d3.scale.quantile().domain([-2.5, 2.5]).range(['#5458A2', '#6689BB', '#FADC97', '#F08460', '#B02B48']),
+                // hexagonBin: function (point, bin) {
+                //     // console.log(bin);
+                //     var currentZ = bin.z || 0;
+                //     var totalAttempts = bin.attempts || 0;
+                //     var totalZ = currentZ * totalAttempts;
+
+                //     var attempts = point.attempts || 1;
+                //     bin.attempts = totalAttempts + attempts;
+                //     bin.z = (totalZ + (point.z * attempts))/bin.attempts;
+                // },
+            };
+
+            d3.select(document.getElementById('chart')).append("svg").chart("BasketballShotChart",options).draw(data); 
+        };
+
+        var findPlayer = function(player_name) {
+            var player_url = 'http://localhost:8888/nbashots/player.php?name=' + player_name;
+            var data;
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET", player_url, false ); // false for synchronous request
+            xmlHttp.send( null );
+
+            var data = JSON.parse(xmlHttp.responseText);
+
+            if (data.length != 0)
+            {
+                $('#chart').html('');
+                buildChart(data[0].id,data[0].player_name);
+            }
+            
+            if (data.length === 0)
+            {
+                $('#warning').show();
+            }
+            
+        };
+
+        $('#find_player').click(function() {
+            $('#warning').hide();
+            findPlayer($('#player_name').val());
+        });
+        
+        buildChart();
+    </script>
+</html>
